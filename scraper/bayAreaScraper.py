@@ -34,7 +34,7 @@ class BayAreaFocusGroupsScsraper:
         self.driver.find_element(By.ID, "wp-submit").click()
         time.sleep(3)
 
-    def scrape_bay_area(self):
+    async def scrape_bay_area(self):
         """
         Logs in if necessary, then scrapes study listings and saves new studies to the database.
         """
@@ -68,8 +68,10 @@ class BayAreaFocusGroupsScsraper:
             answer = f"{title}\n{result}\nLink: {href_value}"
             
             if "L&E Opinions" not in answer and not self.database.is_answer_in_db(answer):
-                self.database.save_answer_to_db(answer)
-                asyncio.run(self.messaging_service.send_message(answer))
+                self.database.save_answer_to_db(answer, href_value, "Bay Area Focus Groups")
+                await self.messaging_service.send_message(answer)
+            else:
+                print("Bay Area Focus Group already in database.")
 
         time.sleep(3)
         # Close the driver session

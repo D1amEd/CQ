@@ -33,7 +33,7 @@ class LyEScraper:
         """
         self._setup_driver()
         self.driver.get(self.login_url)
-        time.sleep(5)
+        time.sleep(3)
 
         # Enter email and password
         self.driver.find_element(By.ID, "ctl00_cphBody_EmailTextBox").send_keys(self.email)
@@ -42,9 +42,9 @@ class LyEScraper:
         # Click on the captcha checkbox (or other login button if applicable)
         captcha_button = self.driver.find_element(By.CLASS_NAME, "g-recaptcha")
         captcha_button.click()
-        time.sleep(5)
+        time.sleep(3)
 
-    def scrape_lye_studies(self):
+    async def scrape_lye_studies(self):
         """
         Logs in if necessary, then scrapes study listings and saves new studies to the database.
         """
@@ -58,11 +58,20 @@ class LyEScraper:
         for i, element in enumerate(elements[:3]):  # Limiting to first 3 elements
             # Extract relevant data from each study listing
             title = element.find_element(By.CSS_SELECTOR, "h3").text
-            compensation = element.find_element(By.XPATH, ".//li[i[contains(@class, 'fa-dollar-sign')]]").text
+            compensation=""
+            
+            try:
+                compensation = element.find_element(By.XPATH, ".//li[i[contains(@class, 'fa-dollar-sign')]]").text
+            except NoSuchElementException:
+                compensation = "No compensation listed"
             location = element.find_element(By.CLASS_NAME, "fa-location-dot").find_element(By.XPATH, "..").text
             age = element.find_element(By.CLASS_NAME, "fa-cake-candles").find_element(By.XPATH, "..").text
             gender = element.find_element(By.CLASS_NAME, "fa-user").find_element(By.XPATH, "..").text
-            study_type = element.find_element(By.CLASS_NAME, "fa-comment").find_element(By.XPATH, "..").text
+            study_type=""
+            try:
+                study_type = element.find_element(By.CLASS_NAME, "fa-comment").find_element(By.XPATH, "..").text
+            except NoSuchElementException:
+                study_type = "No Study listed"
             photo_id = element.find_element(By.CLASS_NAME, "fa-id-card").find_element(By.XPATH, "..").text
             description = element.find_element(By.CSS_SELECTOR, "p").text
             link = element.find_element(By.CSS_SELECTOR, "a").get_attribute("href")
@@ -73,18 +82,18 @@ class LyEScraper:
                 f"{description}\nLink: {link}"
             )
 
-            asyncio.run(self.handle_message(answer))
+            await self.handle_message(answer, link)
             time.sleep(5)
 
         # Close the driver session
         self.driver.quit()
         self.driver = None
         
-    async def handle_message(self, answer):
+    async def handle_message(self, answer, link):
         if self.database.is_answer_in_db(answer):
-            print("Answer already in database.")
+            print("Lye study answer already in database.")
         else:
-            self.database.save_answer_to_db(answer)
+            self.database.save_answer_to_db(answer, link, "L&E Research")
             await self.messaging_service.send_message(answer)  # Await the async method
             await asyncio.sleep(5)  # Replace `time.sleep` with `await asyncio.sleep`
     

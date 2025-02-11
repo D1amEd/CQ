@@ -20,7 +20,7 @@ class UserInterviewsScraper:
         self.headless = headless
         self.messaging_service = messaging_service
 
-    def scrape_user_interviews(self):
+    async def scrape_user_interviews(self):
         """
         Logs in using cookies, scrapes study listings, and saves new studies to the database.
         """
@@ -36,12 +36,14 @@ class UserInterviewsScraper:
         for cookie in self.cookies:
             self.driver.add_cookie(cookie)
         self.driver.get(self.url)  # Reload the page after setting cookies
-        time.sleep(5)
+        time.sleep(3)
 
         # Try to close any potential sign-in pop-up or warning
         try:
-            print("Trying to close any sign-in or pop-up buttons...")
-            self.driver.find_element(By.CSS_SELECTOR, "button[aria-label='close warning']").click()
+            self.driver.find_element(By.CLASS_NAME, "osano-cm-accept").click()
+            self.driver.find_element(By.CSS_SELECTOR, ".svg-inline--fa.fa-xmark").click()
+            self.driver.find_element(By.CSS_SELECTOR, "#ab9ef3ea-c4d2-468b-995b-367805faab9b > div.osano-cm-dialog__buttons.osano-cm-buttons > button.osano-cm-accept.osano-cm-buttons__button.osano-cm-button.osano-cm-button--type_accept").click() 
+            
         except NoSuchElementException:
             print("No pop-up found, continuing...")
 
@@ -52,10 +54,28 @@ class UserInterviewsScraper:
             # Extract relevant data from each study listing
             title = element.find_element(By.CSS_SELECTOR, "h2.ProjectListing__title").text
             price = element.find_element(By.CSS_SELECTOR, "div.ProjectListing__compensation").text
-            clipboard_button = element.find_element(By.CSS_SELECTOR, ".CopyToClipboardButton.btn")
-            ActionChains(self.driver).scroll_to_element(clipboard_button).perform()
-            clipboard_button.click()
-            link = pyperclip.paste()  # Copy the link to clipboard
+            # Inject JavaScript to override the copy-to-clipboard function
+    
+            copy_button = element.find_element(By.CLASS_NAME, "CopyToClipboardButton")
+            link = self.driver.execute_script("""
+            const element = arguments[0];
+            const reactProps = Object.entries(element).find(([key]) => key.startsWith('__reactProps$'))?.[1];
+            return reactProps?.children?.props?.text || null;  // Safely extract the `text` prop
+        """, copy_button)  # Pass the current button element to JavaScript
+
+            # Retrieve the intercepted text
+#             link = self.driver.execute_script("""
+#     const element = document.querySelector('.CopyToClipboardButton');  // Update the selector
+#     const reactProps = Object.entries(element).find(([key]) => key.startsWith('__reactProps$'))?.[1];
+#     return reactProps?.children?.props?.text || null;  // Safely extract the `text` prop
+# """)
+            
+            # clipboard_button = element.find_element(By.CSS_SELECTOR, ".CopyToClipboardButton.btn")
+            # clipboard_button.click()
+            # ActionChains(self.driver).scroll_to_element(clipboard_button).perform()
+            # clipboard_button.click()
+            # link = pyperclip.paste()  # Copy the link to clipboard
+            # print(link)
 
             items = element.find_elements(By.CSS_SELECTOR, "li.ListingCategoryIcons__item")
             study_type = items[0].find_element(By.CSS_SELECTOR, "span.ListingCategoryIcons__name").text
@@ -85,11 +105,11 @@ class UserInterviewsScraper:
 
             # Check if the answer is already in the database
             if self.database.is_answer_in_db(fake_answer):
-                print("Study already exists in the database.")
+                print("UserInterviews Study already exists in the database.")
             else:
-                self.database.save_answer_to_db(fake_answer)
-                asyncio.run(self.handle_message(answer))
-                time.sleep(5)
+                self.database.save_answer_to_db(fake_answer, link, "User Interviews")
+                await self.handle_message(answer)
+                time.sleep(2)
 
         # Close the browser session
         self.driver.quit()
