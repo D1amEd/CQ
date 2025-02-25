@@ -112,7 +112,7 @@ async def user_interviews_task():
     
 async def gromotion_task():
     """Run GromotionScraper indefinitely every X seconds."""
-    await asyncio.sleep(10)
+    # await asyncio.sleep(10)
     while True:
         try:
             print("[Gromotion] Starting scrape")

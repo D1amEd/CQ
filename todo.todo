@@ -1,0 +1,4 @@
+Bugs:
+    ☐ Fix Error in FocusGroupsScraper: list index out of range
+Development:
+    ☐ Finish newsLetter implementation
